@@ -1,6 +1,5 @@
-import { createContext, useContext, useState } from 'react'
-
-const AuthContext = createContext(null)
+import { useState } from 'react'
+import { AuthContext } from './AuthContextValue'
 
 export function AuthProvider({ children }) {
   const stored = typeof window !== 'undefined' ? localStorage.getItem('sol-chat-user') : null
@@ -37,10 +36,3 @@ export function AuthProvider({ children }) {
 }
 
 // Hook moved to src/hooks/useAuth.js to support fast refresh
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider')
-  }
-  return context
-}
