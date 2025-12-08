@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Chat Interface</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Noto+Sans:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+        darkMode: "class",
+        theme: {
+            extend: {
+                colors: {
+                    "primary": "#F7C6D2",
+                    "primary-hover": "#f5b5c6",
+                    "secondary": "#CFF6E1",
+                    "secondary-hover": "#bcefd5",
+                    "background": "#ffffff",
+                    "surface": "#f8fafc",
+                    "border-color": "#e2e8f0",
+                    "text-primary": "#0f172a",
+                    "text-secondary": "#64748b",
+                    "text-on-primary": "#1e293b",
+                },
+                fontFamily: {
+                    "display": ["Space Grotesk", "sans-serif"],
+                    "body": ["Noto Sans", "sans-serif"]
+                },
+                borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "full": "9999px" },
+            },
+        },
+    }
+</script>
+<style>
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+    .message-content pre {
+        background-color: #f8fafc;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        overflow-x: auto;
+        margin-top: 0.5rem;
+        margin-bottom: 0.5rem;
+        border: 1px solid #e2e8f0;
+    }
+</style>
+</head>
+<body class="bg-background text-text-primary font-display overflow-hidden h-screen flex w-full">
+<aside class="w-[280px] hidden md:flex flex-col border-r border-border-color bg-surface h-full shrink-0 z-20">
+<div class="p-4 flex flex-col gap-4">
+<button class="flex w-full cursor-pointer items-center gap-3 rounded-lg h-12 px-4 bg-primary hover:bg-primary-hover transition-colors text-text-on-primary text-sm font-bold shadow-lg shadow-primary/20 group">
+<span class="material-symbols-outlined text-[20px]">add</span>
+<span class="truncate">New Chat</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto px-2 py-2 flex flex-col gap-6">
+<div class="flex flex-col gap-1 px-2">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-text-secondary hover:bg-slate-200/60 hover:text-text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">explore</span>
+<span class="text-sm font-medium">Discover Agents</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-text-secondary hover:bg-slate-200/60 hover:text-text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">folder_open</span>
+<span class="text-sm font-medium">Library</span>
+</a>
+</div>
+<div class="px-2">
+<div class="relative">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary material-symbols-outlined text-[18px]">search</span>
+<input class="w-full bg-slate-200/60 border-none rounded-lg py-2 pl-9 pr-3 text-sm text-text-primary placeholder:text-text-secondary focus:ring-1 focus:ring-primary" placeholder="Search chats..." type="text"/>
+</div>
+</div>
+<div class="flex flex-col gap-2 px-2">
+<div class="px-3 text-xs font-bold text-text-secondary uppercase tracking-wider">Today</div>
+<button class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-secondary text-text-primary group cursor-pointer text-left">
+<span class="material-symbols-outlined text-[18px] text-black/60">chat_bubble</span>
+<span class="text-sm font-medium truncate flex-1">Transformer Architecture</span>
+</button>
+<button class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-slate-200/60 hover:text-text-primary transition-colors cursor-pointer text-left">
+<span class="material-symbols-outlined text-[18px]">chat_bubble_outline</span>
+<span class="text-sm font-medium truncate flex-1">React Component Props</span>
+</button>
+</div>
+<div class="flex flex-col gap-2 px-2">
+<div class="px-3 text-xs font-bold text-text-secondary uppercase tracking-wider">Yesterday</div>
+<button class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-slate-200/60 hover:text-text-primary transition-colors cursor-pointer text-left">
+<span class="material-symbols-outlined text-[18px]">chat_bubble_outline</span>
+<span class="text-sm font-medium truncate flex-1">Python Data Analysis</span>
+</button>
+<button class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-slate-200/60 hover:text-text-primary transition-colors cursor-pointer text-left">
+<span class="material-symbols-outlined text-[18px]">chat_bubble_outline</span>
+<span class="text-sm font-medium truncate flex-1">Debugging SQL Query</span>
+</button>
+<button class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-slate-200/60 hover:text-text-primary transition-colors cursor-pointer text-left">
+<span class="material-symbols-outlined text-[18px]">chat_bubble_outline</span>
+<span class="text-sm font-medium truncate flex-1">Marketing Copy Draft</span>
+</button>
+</div>
+</div>
+<div class="p-4 border-t border-border-color">
+<div class="flex items-center justify-between group cursor-pointer p-2 rounded-lg hover:bg-slate-200/60 transition-colors">
+<div class="flex items-center gap-3">
+<div class="bg-center bg-no-repeat bg-cover rounded-full h-9 w-9 border border-border-color" data-alt="User Avatar" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBuvsMuLKu8mcJaNVHMzUYabcuPUCqzUtvlFr8tYTdClaTIXg8zsRrd2j-NWf-iVKUqda4RljsBYU-WDV1V7wjpQDhUI-Eo0t8hImPG3PJH8Gf5SUr4qpsHFQWby4rryYr5VFm5gwwfToTBvOBhgDDov7fBP4SZ_Yr4yWHWEWoPu00JWlWcKTgKr8cEAZ-V-9Lnq2mmhjHZfOt88njLHPYal-4NJfPtefyPylYfl3EjTjrRDC2gseHqbeiS4cDnCtigCszFPtQO24Kv");'></div>
+<div class="flex flex-col">
+<span class="text-sm font-bold text-text-primary leading-none">DevUser</span>
+<span class="text-xs text-green-600 font-semibold mt-1">Pro Plan</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-text-secondary">settings</span>
+</div>
+</div>
+</aside>
+<main class="flex-1 flex flex-col h-full relative bg-background">
+<header class="h-16 border-b border-border-color flex items-center justify-between px-6 bg-background/80 backdrop-blur-md sticky top-0 z-10">
+<div class="flex items-center gap-3">
+<button class="md:hidden p-2 text-text-secondary hover:text-text-primary">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<div class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-surface cursor-pointer transition-colors group">
+<span class="text-lg font-bold tracking-tight">GPT-4 Turbo</span>
+<span class="material-symbols-outlined text-text-secondary text-[20px] group-hover:text-text-primary">expand_more</span>
+</div>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 border border-green-200 uppercase tracking-wide">Online</span>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center justify-center h-9 w-9 rounded-lg text-text-secondary hover:bg-surface hover:text-text-primary transition-colors" title="History">
+<span class="material-symbols-outlined text-[20px]">history</span>
+</button>
+<button class="flex items-center gap-2 h-9 px-4 rounded-lg bg-surface border border-border-color text-text-primary text-sm font-medium hover:bg-slate-200/60 transition-colors">
+<span class="material-symbols-outlined text-[18px]">ios_share</span>
+<span>Share</span>
+</button>
+</div>
+</header>
+<div class="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col gap-6">
+<div class="max-w-3xl mx-auto w-full flex flex-col gap-8 pb-4">
+<div class="flex justify-center">
+<span class="text-xs font-medium text-text-secondary bg-surface px-3 py-1 rounded-full border border-border-color">Today, 10:23 AM</span>
+</div>
+<div class="flex flex-col items-end gap-2 group/message">
+<div class="flex items-end gap-3 max-w-[85%] md:max-w-[75%]">
+<div class="flex flex-col gap-1 items-end">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-xs text-text-secondary opacity-0 group-hover/message:opacity-100 transition-opacity">You</span>
+</div>
+<div class="bg-black text-white px-5 py-3.5 rounded-2xl rounded-tr-sm text-[15px] leading-relaxed shadow-md">
+<p>Can you explain how the Transformer architecture uses self-attention mechanisms? I'm trying to understand the Q, K, V matrices.</p>
+</div>
+</div>
+<div class="bg-center bg-no-repeat bg-cover rounded-full h-8 w-8 shrink-0 border border-border-color mb-1" data-alt="User Avatar" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCi6PSXTvU_vW2aP9nZN8FP-aBeio0vNoKcf1WAvkE6Flf0F1q9ky3xa3LRA2Sugwr0-rLyQnX5qMzLvBVLwBlvXkrLlcuiGCMQquA00v8h99CdFkq4NWvFsIJUeksr2927xyz5GKK8sorUrjU1V21CZ0QVyfmY0CBOIXsbi4jvgOkHIK2MZLSvYXWwaMyNdfJIeed-29s-RBSNwsZ6ZVJ_gBRr3N-LM3Qm8Fw7-LPvfRtByX_PxuphJRUT90rVcOD3nxzHWwgJo5mD");'></div>
+</div>
+</div>
+<div class="flex flex-col items-start gap-2 group/message">
+<div class="flex items-start gap-4 max-w-[90%] md:max-w-[85%]">
+<div class="flex items-center justify-center h-8 w-8 rounded-full bg-secondary shrink-0 mt-1 shadow-lg shadow-secondary/30">
+<span class="material-symbols-outlined text-text-on-primary text-[18px]">smart_toy</span>
+</div>
+<div class="flex flex-col gap-1 w-full">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-sm font-bold text-text-primary">GPT-4</span>
+<span class="text-xs text-text-secondary">10:24 AM</span>
+</div>
+<div class="text-slate-600 text-[15px] leading-relaxed message-content bg-surface p-5 rounded-2xl rounded-tl-sm border border-border-color">
+<p class="mb-3">Certainly. The core idea behind <strong>Self-Attention</strong> in Transformers is to allow the model to weigh the importance of different words in a sentence relative to each other.</p>
+<p class="mb-3">Think of it as a retrieval system. For every token (word), we generate three vectors:</p>
+<ul class="list-disc pl-5 mb-4 space-y-1 text-slate-500">
+<li><strong>Query (Q):</strong> What the token is looking for.</li>
+<li><strong>Key (K):</strong> What the token contains/offers.</li>
+<li><strong>Value (V):</strong> The actual information content of the token.</li>
+</ul>
+<p class="mb-2">The attention score is calculated by taking the dot product of the Query and the Key.</p>
+<pre><code class="language-python text-sm font-mono text-indigo-500">import numpy as np
+def scaled_dot_product_attention(Q, K, V):
+    d_k = Q.shape[-1]
+    scores = np.matmul(Q, K.T) / np.sqrt(d_k)
+    weights = softmax(scores)
+    return np.matmul(weights, V)</code></pre>
+<p class="mt-3">The result determines how much focus to put on other parts of the input sequence when encoding the current token.</p>
+</div>
+<div class="flex items-center gap-2 mt-2 opacity-0 group-hover/message:opacity-100 transition-opacity">
+<button class="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-slate-200" title="Copy">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+</button>
+<button class="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-slate-200" title="Regenerate">
+<span class="material-symbols-outlined text-[16px]">refresh</span>
+</button>
+<button class="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-slate-200" title="Good response">
+<span class="material-symbols-outlined text-[16px]">thumb_up</span>
+</button>
+<button class="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-slate-200" title="Bad response">
+<span class="material-symbols-outlined text-[16px]">thumb_down</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<div class="flex flex-col items-end gap-2 group/message">
+<div class="flex items-end gap-3 max-w-[85%] md:max-w-[75%]">
+<div class="flex flex-col gap-1 items-end">
+<div class="bg-black text-white px-5 py-3.5 rounded-2xl rounded-tr-sm text-[15px] leading-relaxed shadow-md">
+<p>Does the softmax ensure the weights sum to 1?</p>
+</div>
+</div>
+<div class="bg-center bg-no-repeat bg-cover rounded-full h-8 w-8 shrink-0 border border-border-color mb-1" data-alt="User Avatar" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuApE6p-53VPtFbXyReC0wxIX54bvadM_YHsrhz73mOR6VNnv5xi1ISAMZT7T8dckpaWaB4EmBHBZN0u56-6zIJcXWywZSOzI9B-hN85DQID8d_tOAkEY8WlamvBcuFB44UB3CsIyw8kIlv9tmAE0GzQTAlMHOaaacFR5tS0B2v_xxWu3wLnbVfMz1zSQ8OnlTqw3F7A81p72vgJKZANorgK0UMyh_dToX8DY03ovShbcZ1h0YlZPI2Bjxq3jRBBJ7PwOhDPa_J6d5OY");'></div>
+</div>
+</div>
+<div class="flex flex-col items-start gap-2">
+<div class="flex items-start gap-4 max-w-[90%]">
+<div class="flex items-center justify-center h-8 w-8 rounded-full bg-secondary shrink-0 mt-1">
+<span class="material-symbols-outlined text-text-on-primary text-[18px] animate-pulse">smart_toy</span>
+</div>
+<div class="flex flex-col gap-1 w-full pt-2">
+<div class="flex items-center gap-2">
+<span class="h-2 w-2 rounded-full bg-text-secondary animate-bounce"></span>
+<span class="h-2 w-2 rounded-full bg-text-secondary animate-bounce [animation-delay:0.2s]"></span>
+<span class="h-2 w-2 rounded-full bg-text-secondary animate-bounce [animation-delay:0.4s]"></span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="p-4 md:pb-6 md:px-8 w-full bg-background">
+<div class="max-w-3xl mx-auto w-full relative">
+<div class="flex flex-col gap-2 bg-surface border border-border-color rounded-2xl shadow-xl p-3 focus-within:ring-1 focus-within:ring-primary/50 focus-within:border-primary/50 transition-all">
+<textarea class="w-full bg-transparent border-none text-text-primary placeholder:text-text-secondary focus:ring-0 resize-none max-h-[200px] min-h-[56px] py-2 px-2 text-[16px]" placeholder="Message GPT-4..." rows="1"></textarea>
+<div class="flex items-center justify-between pt-2 border-t border-slate-200">
+<div class="flex items-center gap-1">
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary-hover text-xs font-bold text-text-on-primary transition-colors mr-2">
+<span class="material-symbols-outlined text-[16px]">colors_spark</span>
+                                GPT-4
+                            </button>
+<button class="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-slate-200/60 transition-colors" title="Attach file">
+<span class="material-symbols-outlined text-[20px]">attach_file</span>
+</button>
+<button class="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-slate-200/60 transition-colors" title="Search Web">
+<span class="material-symbols-outlined text-[20px]">globe</span>
+</button>
+<button class="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-slate-200/60 transition-colors" title="Voice Input">
+<span class="material-symbols-outlined text-[20px]">mic</span>
+</button>
+</div>
+<div class="flex items-center gap-2">
+<span class="hidden sm:inline text-xs text-text-secondary mr-2">Use <kbd class="px-1.5 py-0.5 rounded bg-white text-text-primary font-mono text-[10px] border border-slate-300">Shift</kbd> + <kbd class="px-1.5 py-0.5 rounded bg-white text-text-primary font-mono text-[10px] border border-slate-300">Return</kbd> for new line</span>
+<button class="flex items-center justify-center h-9 w-9 rounded-lg bg-primary hover:bg-primary-hover text-text-on-primary transition-all shadow-lg shadow-primary/30" title="Send Message">
+<span class="material-symbols-outlined text-[20px]">arrow_upward</span>
+</button>
+</div>
+</div>
+</div>
+<div class="text-center mt-3">
+<p class="text-[11px] text-text-secondary">LLMs can make mistakes. Verify important information.</p>
+</div>
+</div>
+</div>
+</main>
+
+</body></html>
