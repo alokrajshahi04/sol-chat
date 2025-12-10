@@ -5,7 +5,6 @@ const ChatSessionSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     title: { type: String },
     models: [String],
-    status: { type: String, enum: ["active", "completed"] },
   },
   { timestamps: true }
 );

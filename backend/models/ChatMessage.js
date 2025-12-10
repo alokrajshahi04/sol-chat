@@ -10,10 +10,15 @@ const ChatMessageSchema = new mongoose.Schema(
     role: { type: String, enum: ["user", "assistant"] },
     model: { type: String },
     content: { type: String, default: "" },
+    status: {
+      type: String,
+      enum: ["completed", "incomplete"],
+      default: "incomplete",
+    },
   },
   { timestamps: true }
 );
 
-const ChatMessage = mongoose.model("ChatSession", ChatMessageSchema);
+const ChatMessage = mongoose.model("ChatMessage", ChatMessageSchema);
 
 module.exports = ChatMessage;
