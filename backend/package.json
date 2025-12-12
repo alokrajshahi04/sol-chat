@@ -5,6 +5,7 @@
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "express-session": "^1.18.2",
+    "joi": "^18.0.2",
     "mongoose": "^9.0.1",
     "openai": "^6.10.0",
     "x402-express": "^1.0.0"

@@ -35,7 +35,7 @@ module.exports.checkCredits = async function (req, res, next) {
     amount: creditsMissing,
     createdAt: new Date(),
   };
-  await User.save();
+  await user.save();
 
   return facilitator.paymentRequired(res, paymentReq);
 };

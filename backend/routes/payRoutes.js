@@ -13,7 +13,7 @@ router.post("/verify", async (req, res) => {
   if (req.session.userId) {
     user = await User.findById(req.session.userId);
   } else if (req.session.guestId) {
-    guest = await Guest.findById(req.session.guestId);
+    user = await Guest.findById(req.session.guestId);
   } else {
     return res.status(404).json({ error: "User session does not exist" });
   }

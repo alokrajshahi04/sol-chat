@@ -2,28 +2,39 @@ const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
+const Joi = require("joi");
+const { validateInput } = require("../middlewares/inputValidationMiddlewares");
 
-router.post("/signup", async (req, res) => {
-  const { email, password } = req.body;
+const userValidationSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().required(),
+}).required();
 
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    return res.status(400).json({ error: "User Already Exists" });
+router.post(
+  "/signup",
+  validateInput(userValidationSchema),
+  async (req, res) => {
+    const { email, password } = req.body;
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: "User Already Exists" });
+    }
+
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+    const user = new User({ email, passwordHash });
+    await user.save();
+
+    req.session.userId = user._id;
+    res.status(200).json({
+      message: "User signed up",
+      user: { id: user._id, email: user.email },
+    });
   }
+);
 
-  const saltRounds = 10;
-  const passwordHash = await bcrypt.hash(password, saltRounds);
-  const user = new User({ email, passwordHash });
-  await user.save();
-
-  req.session.userId = user._id;
-  res.status(200).json({
-    message: "User signed up",
-    user: { id: user._id, email: user.email },
-  });
-});
-
-router.post("/login", async (req, res) => {
+router.post("/login", validateInput(userValidationSchema), async (req, res) => {
   const { email, password } = req.body;
 
   const user = await User.findOne({ email });

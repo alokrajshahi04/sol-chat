@@ -7,10 +7,24 @@ const {
   chatSessionValid,
   queryMessageValid,
 } = require("../middlewares/chatMiddlewares");
-const { checkCredits } = require("../middlewares/paymentMiddlewares");
+const { checkCredits } = require("../models/paymentMiddlewares");
 const { streamFromModel } = require("../lib/streamFromModel");
+const Joi = require("joi");
+const { validateInput } = require("../middlewares/inputValidationMiddlewares");
 
-router.post("/sessions", async (req, res) => {
+const MODELS = ["gpt-5.1", "gpt-5-mini"];
+
+const sessionJoiSchema = Joi.object({
+  models: Joi.array()
+    .items(Joi.string.valid(...MODELS))
+    .min(1),
+  title: Joi.string(),
+}).required();
+const queryJoiSchema = Joi.object({
+  query: Joi.string().required(),
+}).required();
+
+router.post("/sessions", validateInput(sessionJoiSchema), async (req, res) => {
   const { models, title } = req.body;
   const chatSession = new ChatSession({
     title: title || "New Chat",
@@ -40,6 +54,7 @@ router.get("/sessions", isAuthenticated, async (req, res) => {
 
 router.post(
   "/session/:chatSessionId",
+  validateInput(queryJoiSchema),
   chatSessionValid,
   checkGuest,
   checkCredits,
