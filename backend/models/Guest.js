@@ -1,9 +1,7 @@
 const mongoose = require("mongoose");
 
-const UserSchema = new mongoose.Schema(
+const GuestSchema = new mongoose.Schema(
   {
-    email: { type: String, required: true, unique: true },
-    passwordHash: { type: String, required: true },
     credits: { type: Number, default: 0 },
     pendingPayment: {
       reference: { type: String },
@@ -14,6 +12,6 @@ const UserSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const User = mongoose.model("User", UserSchema);
+const Guest = mongoose.model("Guest", GuestSchema);
 
-module.exports = User;
+module.exports = Guest;

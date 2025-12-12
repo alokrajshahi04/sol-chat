@@ -18,6 +18,7 @@ module.exports.chatSessionValid = async function (req, res, next) {
     });
   }
 
+  req.chatSession = chatSession;
   next();
 };
 
@@ -43,6 +44,5 @@ module.exports.queryMessageValid = async function (req, res, next) {
 
   req.queryMessage = queryMessage;
   req.chatSession = chatSession;
-
   next();
 };

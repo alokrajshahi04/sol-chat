@@ -7,6 +7,7 @@ const {
   chatSessionValid,
   queryMessageValid,
 } = require("../middlewares/chatMiddlewares");
+const { checkCredits } = require("../middlewares/paymentMiddlewares");
 const { streamFromModel } = require("../lib/streamFromModel");
 
 router.post("/sessions", async (req, res) => {
@@ -37,19 +38,30 @@ router.get("/sessions", isAuthenticated, async (req, res) => {
   });
 });
 
-router.post("/session/:chatSessionId", chatSessionValid, async (req, res) => {
-  const chatSessionId = req.params.chatSessionId;
-  const { query } = req.body;
+router.post(
+  "/session/:chatSessionId",
+  chatSessionValid,
+  checkGuest,
+  checkCredits,
+  async (req, res) => {
+    const chatSessionId = req.params.chatSessionId;
+    const chatSession = req.chatSession;
+    const creditsRequired = chatSession.models.length;
+    const { query } = req.body;
 
-  const queryMessage = new ChatMessage({
-    chatSessionId,
-    role: "user",
-    content: query,
-  });
-  await queryMessage.save();
+    const queryMessage = new ChatMessage({
+      chatSessionId,
+      role: "user",
+      content: query,
+    });
+    await queryMessage.save();
 
-  res.status(202).json({ queryId: queryMessage._id });
-});
+    req.user.credits -= creditsRequired;
+    await req.user.save();
+
+    res.status(202).json({ queryId: queryMessage._id });
+  }
+);
 
 router.get("/session/:chatSessionId", chatSessionValid, async (req, res) => {
   const chatSessionId = req.params.chatSessionId;
