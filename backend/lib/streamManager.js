@@ -1,16 +1,21 @@
 // In-memory stream manager for LLM responses
 // Accumulates tokens, saves to DB at intervals, handles SSE subscriptions
 
-const { EventEmitter } = require('events');
+const { EventEmitter } = require("events");
 
 const activeStreams = new Map();
 const streamEvents = new EventEmitter();
 streamEvents.setMaxListeners(100);
 
-const SAVE_INTERVAL_MS = 3000;
-const STREAM_TIMEOUT_MS = 5 * 60 * 1000;
+const {
+  STREAM_SAVE_INTERVAL_MS,
+  STREAM_TIMEOUT_MS,
+} = require("../config/constants");
 
-function initStream(queryId, { chatSessionId, models, creditsRequired, accountId, accountType }) {
+function initStream(
+  queryId,
+  { chatSessionId, models, creditsRequired, accountId, accountType }
+) {
   const stream = {
     queryId,
     chatSessionId,
@@ -20,16 +25,19 @@ function initStream(queryId, { chatSessionId, models, creditsRequired, accountId
     accountType,
     responses: {},
     completedModels: new Set(),
-    status: 'streaming',
+    status: "streaming",
     startedAt: Date.now(),
     saveInterval: null,
   };
 
-  models.forEach(model => stream.responses[model] = '');
+  models.forEach((model) => (stream.responses[model] = ""));
   activeStreams.set(queryId, stream);
-  
-  stream.saveInterval = setInterval(() => emitSaveEvent(queryId), SAVE_INTERVAL_MS);
-  
+
+  stream.saveInterval = setInterval(
+    () => emitSaveEvent(queryId),
+    STREAM_SAVE_INTERVAL_MS
+  );
+
   return stream;
 }
 
@@ -56,7 +64,7 @@ function completeModel(queryId, model) {
     queryId,
     chatSessionId: stream.chatSessionId,
     model,
-    token: '',
+    token: "",
     isComplete: true,
     allComplete: stream.completedModels.size === stream.models.length,
   });
@@ -70,9 +78,9 @@ function completeStream(queryId) {
   const stream = activeStreams.get(queryId);
   if (!stream) return;
 
-  stream.status = 'completed';
+  stream.status = "completed";
   if (stream.saveInterval) clearInterval(stream.saveInterval);
-  
+
   emitSaveEvent(queryId);
   streamEvents.emit(`done:${queryId}`, {
     queryId,
@@ -98,22 +106,22 @@ function emitSaveEvent(queryId) {
     queryId,
     chatSessionId: stream.chatSessionId,
     responses: { ...stream.responses },
-    isComplete: stream.status === 'completed',
+    isComplete: stream.status === "completed",
   });
 }
 
 function isStreamActive(queryId) {
   const stream = activeStreams.get(queryId);
-  return stream?.status === 'streaming';
+  return stream?.status === "streaming";
 }
 
 function subscribe(queryId, { onChunk, onDone }) {
-  const chunkHandler = data => onChunk?.(data);
-  const doneHandler = data => onDone?.(data);
-  
+  const chunkHandler = (data) => onChunk?.(data);
+  const doneHandler = (data) => onDone?.(data);
+
   streamEvents.on(`chunk:${queryId}`, chunkHandler);
   streamEvents.on(`done:${queryId}`, doneHandler);
-  
+
   return () => {
     streamEvents.off(`chunk:${queryId}`, chunkHandler);
     streamEvents.off(`done:${queryId}`, doneHandler);

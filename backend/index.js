@@ -119,11 +119,9 @@ function setupRoutes() {
 
   app.use((err, req, res, next) => {
     console.error("Error:", err);
-    res
-      .status(500)
-      .json({
-        error: env.NODE_ENV === "production" ? "Server error" : err.message,
-      });
+    res.status(500).json({
+      error: env.NODE_ENV === "production" ? "Server error" : err.message,
+    });
   });
 }
 
