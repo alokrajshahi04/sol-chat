@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Sparkles, Send } from 'lucide-react'
 
-export function Composer({ onSendMessage, isStreaming }) {
+export function Composer({ onSendMessage, isStreaming, selectedModels = [] }) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
@@ -29,6 +29,8 @@ export function Composer({ onSendMessage, isStreaming }) {
     }
   }
 
+  const modelLabel = selectedModels.length <= 1 ? 'Single-model' : 'Multi-model'
+
   return (
     <div className="border-t border-border bg-background px-3 md:px-6 py-4">
       <div className="max-w-3xl mx-auto w-full">
@@ -46,7 +48,7 @@ export function Composer({ onSendMessage, isStreaming }) {
             <div className="flex items-center gap-2 text-muted-foreground">
               <Button variant="secondary" size="sm" className="h-8 px-3 gap-2">
                 <Sparkles className="h-4 w-4" />
-                Multi-model
+                {modelLabel}
               </Button>
             </div>
             <div className="flex items-center gap-3">

@@ -2,8 +2,13 @@ import { useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export function ModelSelector({ options = [], selected = [], onChange }) {
+export function ModelSelector({ options = [], selected = [], onChange, disabled }) {
   const [open, setOpen] = useState(false)
+
+  // Close dropdown if disabled becomes true
+  if (disabled && open) {
+    setOpen(false)
+  }
 
   const toggleModel = (id) => {
     const next = selected.includes(id) ? selected.filter((m) => m !== id) : [...selected, id]
@@ -14,13 +19,17 @@ export function ModelSelector({ options = [], selected = [], onChange }) {
     <div className="relative">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-surface cursor-pointer transition-colors border border-border"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen((o) => !o)}
+        className={cn(
+          "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors border border-border",
+          disabled ? "opacity-50 cursor-not-allowed bg-muted" : "hover:bg-surface cursor-pointer"
+        )}
       >
         <span className="text-lg font-bold tracking-tight">
           {selected.length ? selected.join(', ') : 'Select models'}
         </span>
-        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        {!disabled && <ChevronDown className="h-4 w-4 text-muted-foreground" />}
       </button>
       {open ? (
         <div className="absolute mt-2 w-64 rounded-xl border border-border bg-background shadow-lg z-20 py-2">

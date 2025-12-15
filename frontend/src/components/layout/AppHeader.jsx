@@ -15,6 +15,7 @@ export function AppHeader({
   selectedModels,
   onChangeModels,
   availableModels,
+  modelsDisabled,
 }) {
   const { publicKey, connected } = useWallet()
   const { linkWallet, wallet, isAuthenticated } = useAuth()
@@ -44,6 +45,7 @@ export function AppHeader({
           options={availableModels}
           selected={selectedModels}
           onChange={onChangeModels}
+          disabled={modelsDisabled}
         />
         <Badge className="uppercase text-[10px] tracking-wide px-2 py-1 rounded-full bg-green-100 text-green-700 border border-green-200">
           Online

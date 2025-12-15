@@ -51,14 +51,14 @@ export function MessageList({ turns = [], models = [], isStreaming }) {
                         <span
                           className={cn(
                             'text-[11px] px-2 py-0.5 rounded-full',
-                            resp.status === 'done'
-                              ? 'bg-green-100 text-green-700'
+                            isPending
+                              ? 'bg-amber-100 text-amber-700'
                               : resp.status === 'error'
                                 ? 'bg-red-100 text-red-700'
-                                : 'bg-amber-100 text-amber-700'
+                                : 'bg-green-100 text-green-700'
                           )}
                         >
-                          {resp.status === 'done' ? 'Complete' : resp.status === 'error' ? 'Error' : 'Streaming'}
+                          {isPending ? 'Streaming' : resp.status === 'error' ? 'Error' : 'Complete'}
                         </span>
                       </div>
                       <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none flex-1 overflow-auto">
