@@ -63,7 +63,7 @@ class SolanaService {
   async mintCredits(userWalletAddress, amount) {
     this.ensureInitialized();
     const tokenAccountAddress = await this.getOrCreateTokenAccount(userWalletAddress);
-    
+
     const tx = new Transaction().add(
       createMintToInstruction(
         this.creditsMint,
@@ -72,7 +72,7 @@ class SolanaService {
         amount
       )
     );
-    
+
     const signature = await this.connection.sendTransaction(tx, [this.backendWallet]);
     await this.connection.confirmTransaction(signature);
     return signature;
@@ -81,16 +81,16 @@ class SolanaService {
   async burnCredits(userWalletAddress, amount) {
     this.ensureInitialized();
     const tokenAccountAddress = await this.getTokenAccountAddress(userWalletAddress);
-    
+
     const tx = new Transaction().add(
       createBurnInstruction(
-        tokenAccountAddress,
-        this.creditsMint,
-        this.backendWallet.publicKey,
+        tokenAccountAddress, // account
+        this.creditsMint,    // mint
+        this.backendWallet.publicKey, // owner (authority) -> We act as delegate
         amount
       )
     );
-    
+
     const signature = await this.connection.sendTransaction(tx, [this.backendWallet]);
     await this.connection.confirmTransaction(signature);
     return signature;
@@ -103,24 +103,24 @@ class SolanaService {
         commitment: 'confirmed',
         maxSupportedTransactionVersion: 0,
       });
-      
+
       if (!tx) return { valid: false, error: 'Transaction not found' };
       if (tx.meta?.err) return { valid: false, error: 'Transaction failed' };
-      
+
       const accountKeys = tx.transaction.message.staticAccountKeys || tx.transaction.message.accountKeys;
       const treasuryIndex = accountKeys.findIndex(key => key.toString() === this.treasuryWallet.toString());
-      
+
       if (treasuryIndex === -1) return { valid: false, error: 'Payment not sent to treasury' };
-      
+
       const received = tx.meta.postBalances[treasuryIndex] - tx.meta.preBalances[treasuryIndex];
       if (received < expectedAmountLamports) {
         return { valid: false, error: `Insufficient payment: got ${received}, need ${expectedAmountLamports}` };
       }
-      
+
       if (accountKeys[0].toString() !== expectedPayer) {
         return { valid: false, error: 'Payment from wrong wallet' };
       }
-      
+
       return { valid: true };
     } catch (error) {
       return { valid: false, error: error.message };
@@ -138,6 +138,11 @@ class SolanaService {
       credits: creditsRequired,
       memo: `sol-chat-credits:${creditsRequired}`,
     };
+  }
+
+  getBackendPublicKey() {
+    this.ensureInitialized();
+    return this.backendWallet.publicKey.toString();
   }
 }
 

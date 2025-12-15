@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { ArrowLeft, ExternalLink, Coins, Zap, Calendar, DollarSign } from 'lucide-react'
 import { listTransactions, getTransactionSummary } from '@/api/pay'
 import { useChat } from '@/hooks/useChat'
+import { cn } from '@/lib/utils'
 
 export function TransactionHistoryPage() {
   const navigate = useNavigate()
@@ -103,11 +104,7 @@ export function TransactionHistoryPage() {
                               <Calendar className="h-3 w-3" />
                               {formatDate(tx.createdAt)}
                             </span>
-                            <span>•</span>
-                            <span className="flex items-center gap-1">
-                              <DollarSign className="h-3 w-3" />
-                              {tx.creditsAmount}
-                            </span>
+                            {/* The DollarSign and tx.creditsAmount span is removed from here */}
                           </div>
                           {tx.usage ? (
                             <button
@@ -122,20 +119,26 @@ export function TransactionHistoryPage() {
                           ) : null}
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <Badge variant={tx.status === 'completed' ? 'default' : 'secondary'} className="text-xs">
+                      <div className="flex flex-col items-end gap-1">
+                        <span className={cn(
+                          "font-mono font-bold",
+                          tx.type === 'credit_purchase' ? 'text-green-600' : 'text-foreground'
+                        )}>
+                          {tx.type === 'credit_purchase' ? '+' : '-'}{tx.creditsAmount}
+                        </span>
+                        <Badge variant={tx.status === 'completed' ? 'default' : 'secondary'} className="text-[10px] h-5 px-1.5">
                           {tx.status}
                         </Badge>
                         {explorerUrl(tx) ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs gap-1"
-                            onClick={() => window.open(explorerUrl(tx), '_blank')}
+                          <a
+                            href={explorerUrl(tx)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-1"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            <ExternalLink className="h-3 w-3" />
-                            View
-                          </Button>
+                            View on-chain <ExternalLink className="h-3 w-3" />
+                          </a>
                         ) : null}
                       </div>
                     </div>

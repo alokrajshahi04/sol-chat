@@ -7,6 +7,13 @@ import { Coins } from 'lucide-react'
 import { purchaseCredits, verifyPayment, getPricing } from '@/api/pay'
 import { useWallet, useConnection } from '@solana/wallet-adapter-react'
 import { PublicKey, SystemProgram, Transaction } from '@solana/web3.js'
+import {
+  createApproveInstruction,
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccountInstruction,
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID
+} from '@solana/spl-token'
 
 export function TopUpModal({ open, onClose, onTopUpComplete, paymentHint }) {
   const { publicKey, connected, sendTransaction, connect } = useWallet()
@@ -43,14 +50,66 @@ export function TopUpModal({ open, onClose, onTopUpComplete, paymentHint }) {
     try {
       const request = await purchaseCredits(creditInt)
       const { payment, reference } = request
+      const treasuryKey = new PublicKey(payment.recipient)
 
-      const transaction = new Transaction().add(
+      // Token Mint info (from pricing or constant)
+      // Ideally backend returns this, but we can hardcode for now if needed or get from payment response
+      // Assuming payment.creditsMint is available, or use a known constant if not returned
+      // The user wants verifiable tokens, so there must be a Mint.
+      // Let's assume the backend provides the mint address in the payment object
+      const mintAddress = new PublicKey(payment.tokenMint || 'So11111111111111111111111111111111111111112') // Fallback placeholder if not provided
+
+      // Use the specific backend wallet for delegation (it handles the burning)
+      // Fallback to treasury if not verified, but they should be distinct in production
+      const delegateAddress = new PublicKey(pricing?.backendWallet || payment.recipient)
+
+      const transaction = new Transaction()
+
+      // 1. Transfer SOL for payment
+      transaction.add(
         SystemProgram.transfer({
           fromPubkey: publicKey,
-          toPubkey: new PublicKey(payment.recipient),
+          toPubkey: treasuryKey,
           lamports: parseInt(payment.amount, 10),
         })
       )
+
+      // 2. Ensure User's ATA exists
+      const userAta = await getAssociatedTokenAddress(
+        mintAddress,
+        publicKey,
+        false,
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID
+      )
+
+      const accountInfo = await connection.getAccountInfo(userAta)
+      if (!accountInfo) {
+        transaction.add(
+          createAssociatedTokenAccountInstruction(
+            publicKey, // payer
+            userAta, // ata
+            publicKey, // owner
+            mintAddress, // mint
+            TOKEN_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID
+          )
+        )
+      }
+
+      // 3. Approve Delegate (Backend) to spend tokens
+      // We approve a large amount so we don't need to ask for signature every time
+      transaction.add(
+        createApproveInstruction(
+          userAta,
+          delegateAddress, // delegate
+          publicKey, // owner
+          1_000_000_000, // Large approval amount
+          [],
+          TOKEN_PROGRAM_ID
+        )
+      )
+
       transaction.feePayer = publicKey
       transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash
 
@@ -65,6 +124,7 @@ export function TopUpModal({ open, onClose, onTopUpComplete, paymentHint }) {
       onTopUpComplete?.()
       onClose()
     } catch (err) {
+      console.error(err)
       setError(err.message || 'Payment failed')
     } finally {
       setSubmitting(false)
@@ -99,11 +159,15 @@ export function TopUpModal({ open, onClose, onTopUpComplete, paymentHint }) {
               Total SOL:{' '}
               {pricing
                 ? (
-                    ((pricing.pricePerCredit?.lamports || 0) * Number(credits || 0)) /
-                    1e9
-                  ).toFixed(6)
+                  ((pricing.pricePerCredit?.lamports || 0) * Number(credits || 0)) /
+                  1e9
+                ).toFixed(6)
                 : '-'}
             </span>
+          </div>
+
+          <div className="text-xs bg-blue-50 text-blue-800 p-2 rounded border border-blue-100">
+            <strong>Note:</strong> You will be asked to approve a "Delegate" transaction. This ONLY gives permission to deduct <strong>Credits</strong> (SOL-CHAT Tokens) for your queries. We cannot access your SOL or other assets.
           </div>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}

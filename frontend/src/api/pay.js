@@ -1,7 +1,7 @@
 import { API_BASE_URL, apiFetch } from './config'
 
 export function getBalance() {
-  return apiFetch('/pay/balance')
+  return apiFetch(`/pay/balance?t=${Date.now()}`)
 }
 
 export function getPricing() {
