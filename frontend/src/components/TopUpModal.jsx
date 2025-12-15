@@ -1,124 +1,125 @@
-import { useState } from 'react'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { useEffect, useState } from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
-import { Coins, Check, Sparkles } from 'lucide-react'
-import { creditBundles } from '@/data/mock'
-import { PaymentModal } from '@/components/PaymentModal'
+import { Coins } from 'lucide-react'
+import { purchaseCredits, verifyPayment, getPricing } from '@/api/pay'
+import { useWallet, useConnection } from '@solana/wallet-adapter-react'
+import { PublicKey, SystemProgram, Transaction } from '@solana/web3.js'
 
-export function TopUpModal({ open, onClose, onTopUpComplete }) {
-  const [selectedBundle, setSelectedBundle] = useState(null)
-  const [paymentRequest, setPaymentRequest] = useState(null)
+export function TopUpModal({ open, onClose, onTopUpComplete, paymentHint }) {
+  const { publicKey, connected, sendTransaction, connect } = useWallet()
+  const { connection } = useConnection()
+  const [credits, setCredits] = useState(10)
+  const [pricing, setPricing] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSelectBundle = (bundle) => {
-    setSelectedBundle(bundle)
-    setPaymentRequest({
-      amount: bundle.price,
-      currency: bundle.currency,
-      recipient: 'SoLxxx...MockRecipient123',
-      purpose: `Purchase ${bundle.credits} credits`,
-      bundleId: bundle.id,
-      credits: bundle.credits,
-    })
-  }
+  useEffect(() => {
+    setCredits(paymentHint?.creditsMissing || 10)
+  }, [paymentHint])
 
-  const handlePaymentComplete = () => {
-    if (selectedBundle) {
-      onTopUpComplete?.(selectedBundle.credits)
+  useEffect(() => {
+    if (!open) return
+    getPricing()
+      .then(setPricing)
+      .catch(() => setPricing(null))
+  }, [open])
+
+  const handlePurchase = async () => {
+    if (!connected || !publicKey) {
+      await connect()
+      return
     }
-    setSelectedBundle(null)
-    setPaymentRequest(null)
-    onClose()
+    const creditInt = Number(credits)
+    const min = pricing?.minPurchase || 1
+    if (!creditInt || creditInt < min) {
+      setError(`Minimum purchase is ${min} credits`)
+      return
+    }
+    setSubmitting(true)
+    setError('')
+    try {
+      const request = await purchaseCredits(creditInt)
+      const { payment, reference } = request
+
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: new PublicKey(payment.recipient),
+          lamports: parseInt(payment.amount, 10),
+        })
+      )
+      transaction.feePayer = publicKey
+      transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash
+
+      const signature = await sendTransaction(transaction, connection)
+      await connection.confirmTransaction(signature, 'confirmed')
+
+      await verifyPayment(reference, {
+        signature,
+        payerWallet: publicKey.toBase58(),
+      })
+
+      onTopUpComplete?.()
+      onClose()
+    } catch (err) {
+      setError(err.message || 'Payment failed')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
-    <>
-      <Dialog open={open && !paymentRequest} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Top Up Credits</DialogTitle>
-            <DialogDescription>
-              Choose a bundle and pay with Solana x402. Credits never expire.
-            </DialogDescription>
-          </DialogHeader>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Top up credits</DialogTitle>
+          {pricing ? (
+            <p className="text-sm text-muted-foreground">
+              {pricing.pricePerCredit?.lamports} lamports per credit • min {pricing.minPurchase} credits
+            </p>
+          ) : null}
+        </DialogHeader>
 
-          <div className="grid gap-4 py-4">
-            {creditBundles.map((bundle) => (
-              <Card
-                key={bundle.id}
-                className={`cursor-pointer transition-all ${
-                  bundle.popular
-                    ? 'border-primary shadow-md'
-                    : 'hover:border-primary/50'
-                }`}
-                onClick={() => handleSelectBundle(bundle)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="h-12 w-12 rounded-xl bg-secondary/30 flex items-center justify-center">
-                        <Coins className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-lg">
-                          {bundle.credits} Credits
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          ${bundle.price} {bundle.currency}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      {bundle.popular && (
-                        <Badge className="bg-primary text-primary-foreground">
-                          Most Popular
-                        </Badge>
-                      )}
-                      {bundle.savings && (
-                        <Badge variant="secondary" className="text-xs">
-                          Save {bundle.savings}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+        <div className="flex flex-col gap-4">
+          <label className="flex flex-col gap-2">
+            <span className="text-sm font-semibold">Credits to buy</span>
+            <Input
+              type="number"
+              min={pricing?.minPurchase || 1}
+              value={credits}
+              onChange={(e) => setCredits(e.target.value)}
+            />
+          </label>
+          <div className="flex items-center gap-2 text-sm">
+            <Coins className="h-4 w-4 text-amber-600" />
+            <span>
+              Total SOL:{' '}
+              {pricing
+                ? (
+                    ((pricing.pricePerCredit?.lamports || 0) * Number(credits || 0)) /
+                    1e9
+                  ).toFixed(6)
+                : '-'}
+            </span>
           </div>
 
-          <div className="bg-muted/30 rounded-lg p-4 text-sm text-muted-foreground space-y-2">
-            <div className="flex items-start gap-2">
-              <Check className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-              <span>1 credit = 1 message (any model)</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <Check className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-              <span>Credits never expire</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <Check className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-              <span>Use across all unlocked agents</span>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <PaymentModal
-        open={!!paymentRequest}
-        onClose={() => {
-          setPaymentRequest(null)
-          setSelectedBundle(null)
-        }}
-        paymentRequest={paymentRequest}
-        onPaymentComplete={handlePaymentComplete}
-      />
-    </>
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={onClose} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button className="flex-1" onClick={handlePurchase} disabled={submitting}>
+              {submitting ? 'Processing...' : 'Pay with wallet'}
+            </Button>
+          </div>
+
+          <Badge variant="secondary">Wallet required • Solana {pricing?.network || 'devnet'}</Badge>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

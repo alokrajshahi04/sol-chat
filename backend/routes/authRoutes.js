@@ -33,11 +33,11 @@ const walletSchema = Joi.object({
 router.post('/signup', validateInput(signupSchema), async (req, res) => {
   try {
     const { email, password, name } = req.body;
-    
+
     if (await User.findOne({ email: email.toLowerCase() })) {
       return res.status(409).json({ error: 'Email already registered', code: 'EMAIL_EXISTS' });
     }
-    
+
     const user = new User({
       email: email.toLowerCase(),
       passwordHash: await bcrypt.hash(password, 12),
@@ -45,10 +45,10 @@ router.post('/signup', validateInput(signupSchema), async (req, res) => {
       oauthProvider: 'local',
     });
     await user.save();
-    
+
     req.session.userId = user._id;
     delete req.session.guestId;
-    
+
     res.status(201).json({
       message: 'Account created',
       user: { id: user._id, email: user.email, name: user.name },
@@ -63,22 +63,22 @@ router.post('/login', validateInput(loginSchema), async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email: email.toLowerCase() });
-    
+
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
     }
-    
+
     if (!user.passwordHash) {
       return res.status(401).json({ error: `Use ${user.oauthProvider} login`, code: 'OAUTH_ACCOUNT' });
     }
-    
+
     if (!(await bcrypt.compare(password, user.passwordHash))) {
       return res.status(401).json({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
     }
-    
+
     req.session.userId = user._id;
     delete req.session.guestId;
-    
+
     res.json({
       message: 'Logged in',
       user: {
@@ -105,7 +105,7 @@ router.post('/logout', (req, res) => {
 
 router.get('/me', ensureSession, (req, res) => {
   const { account, accountType } = req;
-  
+
   if (accountType === 'user') {
     res.json({
       authenticated: true,
@@ -132,18 +132,18 @@ router.post('/wallet/connect', ensureSession, validateInput(walletSchema), verif
   try {
     const { account } = req;
     const wallet = req.verifiedWallet;
-    
+
     const existingUser = await User.findOne({ solanaWallet: wallet });
     const existingGuest = await Guest.findOne({ solanaWallet: wallet });
-    
+
     if ((existingUser && existingUser._id.toString() !== account._id.toString()) ||
-        (existingGuest && existingGuest._id.toString() !== account._id.toString())) {
+      (existingGuest && existingGuest._id.toString() !== account._id.toString())) {
       return res.status(409).json({ error: 'Wallet in use', code: 'WALLET_IN_USE' });
     }
-    
+
     account.solanaWallet = wallet;
     await account.save();
-    
+
     res.json({ message: 'Wallet connected', wallet });
   } catch (error) {
     console.error('Wallet connect error:', error);
@@ -162,6 +162,24 @@ router.post('/wallet/disconnect', ensureSession, async (req, res) => {
   } catch (error) {
     console.error('Wallet disconnect error:', error);
     res.status(500).json({ error: 'Disconnect failed', code: 'WALLET_DISCONNECT_ERROR' });
+  }
+});
+
+// Simple wallet connect (no signature required)
+router.post('/wallet/connect-simple', ensureSession, async (req, res) => {
+  try {
+    const { wallet } = req.body;
+    if (!wallet || typeof wallet !== 'string' || wallet.length < 32) {
+      return res.status(400).json({ error: 'Invalid wallet address', code: 'INVALID_WALLET' });
+    }
+
+    req.account.solanaWallet = wallet;
+    await req.account.save();
+
+    res.json({ message: 'Wallet connected', wallet });
+  } catch (error) {
+    console.error('Simple wallet connect error:', error);
+    res.status(500).json({ error: 'Connection failed', code: 'WALLET_CONNECT_ERROR' });
   }
 });
 

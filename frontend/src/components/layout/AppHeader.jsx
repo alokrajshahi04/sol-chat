@@ -1,122 +1,79 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { models, paymentModes } from '@/data/mock'
 import { ModelSelector } from './ModelSelector'
-import { TopUpModal } from '../TopUpModal'
-import { useChat } from '@/hooks/useChat'
-import { Coins, Zap, History } from 'lucide-react'
+import { useWallet } from '@solana/wallet-adapter-react'
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
+import { useAuth } from '@/hooks/useAuth'
+import { Coins, LogIn } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
-export function AppHeader() {
+export function AppHeader({
+  balance,
+  onTopUp,
+  onRefreshBalance,
+  selectedModels,
+  onChangeModels,
+  availableModels,
+}) {
+  const { publicKey, connected } = useWallet()
+  const { linkWallet, wallet, isAuthenticated } = useAuth()
   const navigate = useNavigate()
-  const { paymentMode, updatePaymentMode, getCurrentChat } = useChat()
-  const [credits, setCredits] = useState(() => {
-    const stored = localStorage.getItem('sol-chat-credits')
-    return stored ? parseInt(stored) : 0
-  })
-  const [showTopUp, setShowTopUp] = useState(false)
-  
-  const currentChat = getCurrentChat()
-  const chatAgent = currentChat?.agent
+  const [linking, setLinking] = useState(false)
 
-  // Listen for credits changes
+  // Auto-link wallet when connected
   useEffect(() => {
-    const interval = setInterval(() => {
-      const stored = localStorage.getItem('sol-chat-credits')
-      const newCredits = stored ? parseInt(stored) : 0
-      if (newCredits !== credits) {
-        setCredits(newCredits)
+    if (connected && publicKey) {
+      const newWallet = publicKey.toBase58()
+      if (wallet !== newWallet && !linking) {
+        setLinking(true)
+        linkWallet({ wallet: newWallet })
+          .then(() => onRefreshBalance?.())
+          .catch(() => { })
+          .finally(() => setLinking(false))
+      } else if (wallet === newWallet) {
+        onRefreshBalance?.()
       }
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [credits])
-
-  const handleTopUp = (amount) => {
-    const newBalance = credits + amount
-    setCredits(newBalance)
-    localStorage.setItem('sol-chat-credits', newBalance.toString())
-  }
+    }
+  }, [connected, publicKey, wallet, linking, linkWallet, onRefreshBalance])
 
   return (
-    <header className="h-16 border-b border-border flex items-center justify-between px-4 md:px-6 bg-background/80 backdrop-blur-md sticky top-0 z-10">
-      <div className="flex items-center gap-3">
-        <button className="md:hidden p-2 text-muted-foreground hover:text-foreground">
-          <span className="material-symbols-outlined">menu</span>
-        </button>
-        {chatAgent ? (
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-              <span className="text-white text-sm font-bold">{chatAgent.name.charAt(0)}</span>
-            </div>
-            <div>
-              <div className="text-sm font-semibold">{chatAgent.name}</div>
-              <div className="text-xs text-muted-foreground">{chatAgent.provider}</div>
-            </div>
-          </div>
-        ) : (
-          <ModelSelector options={models} />
-        )}
+    <header className="relative h-16 border-b border-border flex items-center justify-between px-4 md:px-6 bg-background/80 backdrop-blur-md sticky top-0 z-10">
+      <div className="flex items-center gap-4">
+        <ModelSelector
+          options={availableModels}
+          selected={selectedModels}
+          onChange={onChangeModels}
+        />
         <Badge className="uppercase text-[10px] tracking-wide px-2 py-1 rounded-full bg-green-100 text-green-700 border border-green-200">
           Online
         </Badge>
       </div>
       <div className="flex items-center gap-3">
-        {/* Credits Display */}
-        <button
-          onClick={() => setShowTopUp(true)}
-          className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-background hover:bg-surface transition-colors"
-        >
+        <div className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-background">
           <Coins className="h-4 w-4 text-amber-600" />
-          <span className="text-sm font-semibold">{credits}</span>
+          <span className="text-sm font-semibold">{balance ?? '-'}</span>
           <span className="text-xs text-muted-foreground">credits</span>
-        </button>
-
-        {/* Payment Mode Toggle */}
-        <div className="hidden md:flex items-center gap-1 px-1 py-1 rounded-lg bg-muted">
-          {paymentModes.map((mode) => (
-            <button
-              key={mode.id}
-              onClick={() => updatePaymentMode(mode.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                paymentMode === mode.id
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {mode.id === 'pay-per-request' ? (
-                <Zap className="h-3 w-3" />
-              ) : (
-                <Coins className="h-3 w-3" />
-              )}
-              {mode.label}
-              {mode.price && (
-                <span className="text-[10px] opacity-70">${mode.price}</span>
-              )}
-            </button>
-          ))}
         </div>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-9 w-9" 
-          title="Transaction History"
-          onClick={() => navigate('/history')}
-        >
-          <History className="h-5 w-5" />
+        <Button size="sm" variant="secondary" onClick={onTopUp}>
+          Top up
         </Button>
-        <Button variant="outline" size="sm" className="h-9 px-4">
-          <span className="material-symbols-outlined text-[18px]">ios_share</span>
-          Share
-        </Button>
+        <WalletMultiButton
+          style={{
+            height: '36px',
+            borderRadius: '8px',
+            fontSize: '14px',
+            backgroundColor: '#512da8',
+            color: 'white',
+          }}
+        />
+        {!isAuthenticated && (
+          <Button size="sm" variant="outline" onClick={() => navigate('/login')}>
+            <LogIn className="h-4 w-4 mr-1" />
+            Sign in
+          </Button>
+        )}
       </div>
-
-      {/* Top Up Modal */}
-      <TopUpModal
-        open={showTopUp}
-        onClose={() => setShowTopUp(false)}
-        onTopUpComplete={handleTopUp}
-      />
     </header>
   )
 }

@@ -1,137 +1,279 @@
-import { createContext, useState, useEffect } from 'react'
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createSession, deleteSession, fetchSession, listSessions, openQueryStream, sendQuery } from '@/api/chat'
 
-const ChatContext = createContext()
+export const ChatContext = createContext(null)
 
-export { ChatContext }
+const AVAILABLE_MODELS = [
+  { id: 'gpt-5-mini', label: 'GPT 5 Mini', context: '128k', cost: 1 },
+  { id: 'gpt-5.1', label: 'GPT 5.1', context: '128k', cost: 2 },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', context: '1M', cost: 1 },
+]
 
-const generateId = () => `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+const buildEmptyResponses = (models) =>
+  models.reduce((acc, model) => {
+    acc[model] = { text: '', status: 'pending' }
+    return acc
+  }, {})
+
+function mapMessagesToTurns(messages) {
+  const turns = []
+  let current = null
+
+  messages.forEach((msg) => {
+    if (msg.role === 'user') {
+      if (current) turns.push(current)
+      current = {
+        id: `turn-${msg.createdAt || Date.now()}`,
+        query: msg.content,
+        createdAt: msg.createdAt,
+        responses: {},
+      }
+    } else if (msg.role === 'assistant') {
+      if (!current) {
+        current = {
+          id: `turn-${msg.createdAt || Date.now()}`,
+          query: 'Previous question',
+          createdAt: msg.createdAt,
+          responses: {},
+        }
+      }
+      current.responses[msg.model || 'assistant'] = {
+        text: msg.content,
+        status: msg.status,
+      }
+    }
+  })
+
+  if (current) turns.push(current)
+  return turns
+}
 
 export function ChatProvider({ children }) {
-  // Initialize chats from localStorage
-  const [chats, setChats] = useState(() => {
-    const stored = localStorage.getItem('sol-chat-threads')
-    if (stored) {
-      return JSON.parse(stored)
+  const [session, setSession] = useState(null)
+  const [turns, setTurns] = useState([])
+  const [sessions, setSessions] = useState([])
+  const [selectedModels, setSelectedModels] = useState(['gpt-5-mini', 'gpt-5.1'])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [pendingQuery, setPendingQuery] = useState(null)
+  const streamRef = useRef(null)
+
+  const fetchSessions = useCallback(async () => {
+    try {
+      const result = await listSessions()
+      setSessions(result.sessions || [])
+    } catch {
+      // Guests do not have session listing
     }
-    return []
-  })
+  }, [])
 
-  // Initialize activeChat from stored chats
-  const [activeChat, setActiveChat] = useState(() => {
-    const stored = localStorage.getItem('sol-chat-threads')
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      return parsed.length > 0 ? parsed[0].id : null
-    }
-    return null
-  })
+  const ensureSession = useCallback(async () => {
+    if (session?.chatSessionId) return session
+    const created = await createSession(selectedModels)
+    setSession(created)
+    setTurns([])
+    fetchSessions()
+    return created
+  }, [selectedModels, session, fetchSessions])
 
-  // Initialize payment mode from localStorage
-  const [paymentMode, setPaymentMode] = useState(() => {
-    const stored = localStorage.getItem('sol-chat-payment-mode')
-    return stored || 'pay-per-request'
-  })
-
-  // Save chats to localStorage whenever they change
-  useEffect(() => {
-    if (chats.length > 0) {
-      localStorage.setItem('sol-chat-threads', JSON.stringify(chats))
-    }
-  }, [chats])
-
-  const createNewChat = (agent = null, model = 'gpt-4') => {
-    const newChat = {
-      id: generateId(),
-      title: agent ? `Chat with ${agent.name}` : 'New Chat',
-      agent: agent,
-      model: model,
-      messages: [],
-      messagesRemaining: agent ? agent.messagesIncluded : null, // Track remaining messages for agent
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    setChats([newChat, ...chats])
-    setActiveChat(newChat.id)
-    return newChat.id
-  }
-
-  const addMessage = (chatId, message) => {
-    setChats(prevChats =>
-      prevChats.map(chat => {
-        if (chat.id === chatId) {
-          const updatedMessages = [...chat.messages, { ...message, id: `msg_${Date.now()}`, timestamp: new Date().toISOString() }]
-          
-          // Deduct message count for agent chats when assistant responds
-          let newMessagesRemaining = chat.messagesRemaining
-          if (chat.agent && message.role === 'assistant' && !message.typing && newMessagesRemaining !== null) {
-            newMessagesRemaining = Math.max(0, newMessagesRemaining - 1)
-          }
-          
-          // Auto-generate title from first user message
-          let title = chat.title
-          if (chat.title === 'New Chat' && message.role === 'user') {
-            title = message.text.slice(0, 50) + (message.text.length > 50 ? '...' : '')
-          }
-          
-          return {
-            ...chat,
-            messages: updatedMessages,
-            messagesRemaining: newMessagesRemaining,
-            title,
-            updatedAt: new Date().toISOString(),
-          }
-        }
-        return chat
-      })
-    )
-  }
-
-  const updateLastMessage = (chatId, updates) => {
-    setChats(prevChats =>
-      prevChats.map(chat => {
-        if (chat.id === chatId && chat.messages.length > 0) {
-          const messages = [...chat.messages]
-          messages[messages.length - 1] = { ...messages[messages.length - 1], ...updates }
-          return { ...chat, messages, updatedAt: new Date().toISOString() }
-        }
-        return chat
-      })
-    )
-  }
-
-  const deleteChat = (chatId) => {
-    setChats(prevChats => prevChats.filter(chat => chat.id !== chatId))
-    if (activeChat === chatId) {
-      const remaining = chats.filter(chat => chat.id !== chatId)
-      setActiveChat(remaining.length > 0 ? remaining[0].id : null)
-    }
-  }
-
-  const updatePaymentMode = (mode) => {
-    setPaymentMode(mode)
-    localStorage.setItem('sol-chat-payment-mode', mode)
-  }
-
-  const getCurrentChat = () => {
-    return chats.find(chat => chat.id === activeChat)
-  }
-
-  return (
-    <ChatContext.Provider
-      value={{
-        chats,
-        activeChat,
-        setActiveChat,
-        createNewChat,
-        addMessage,
-        updateLastMessage,
-        deleteChat,
-        getCurrentChat,
-        paymentMode,
-        updatePaymentMode,
-      }}
-    >
-      {children}
-    </ChatContext.Provider>
+  const loadSession = useCallback(
+    async (chatSessionId) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const data = await fetchSession(chatSessionId)
+        setSession({ chatSessionId, models: data.models, title: data.title })
+        setSelectedModels(data.models)
+        setTurns(mapMessagesToTurns(data.messages || []))
+      } catch (err) {
+        setError(err.message || 'Failed to load session')
+      } finally {
+        setLoading(false)
+      }
+    },
+    []
   )
+
+  const resetStream = () => {
+    if (streamRef.current) {
+      streamRef.current.close()
+      streamRef.current = null
+    }
+    setIsStreaming(false)
+  }
+
+  useEffect(() => {
+    return () => resetStream()
+  }, [])
+
+  const startStream = useCallback(
+    (queryId) => {
+      resetStream()
+      const source = openQueryStream(queryId)
+      streamRef.current = source
+      setIsStreaming(true)
+
+      source.addEventListener('chunk', (event) => {
+        try {
+          const payload = JSON.parse(event.data)
+          setTurns((prev) =>
+            prev.map((turn) => {
+              if (turn.id !== queryId) return turn
+              return {
+                ...turn,
+                responses: {
+                  ...turn.responses,
+                  [payload.model]: {
+                    text: (turn.responses[payload.model]?.text || '') + (payload.token || ''),
+                    status: payload.isComplete ? 'done' : 'streaming',
+                  },
+                },
+              }
+            })
+          )
+        } catch {
+          // ignore parse errors
+        }
+      })
+
+      source.addEventListener('done', () => {
+        setIsStreaming(false)
+        // Mark all responses as done when stream completes
+        setTurns((prev) =>
+          prev.map((turn) => {
+            if (turn.id !== queryId) return turn
+            const updatedResponses = { ...turn.responses }
+            for (const model of Object.keys(updatedResponses)) {
+              if (updatedResponses[model].status === 'streaming' || updatedResponses[model].status === 'pending') {
+                updatedResponses[model] = { ...updatedResponses[model], status: 'done' }
+              }
+            }
+            return { ...turn, responses: updatedResponses }
+          })
+        )
+        source.close()
+        fetchSessions()
+      })
+
+      source.onerror = () => {
+        setIsStreaming(false)
+        source.close()
+      }
+    },
+    [fetchSessions]
+  )
+
+  const sendMessage = useCallback(
+    async (query) => {
+      setError(null)
+      const activeSession = await ensureSession()
+      const turnId = `q_${Date.now()}`
+      const models = activeSession.models || selectedModels
+
+      // Optimistically add user question
+      setTurns((prev) => [
+        ...prev,
+        {
+          id: turnId,
+          query,
+          createdAt: new Date().toISOString(),
+          responses: buildEmptyResponses(models),
+        },
+      ])
+
+      try {
+        const result = await sendQuery(activeSession.chatSessionId, query)
+        const { queryId } = result
+
+        // Associate stream with this turn
+        setTurns((prev) =>
+          prev.map((turn) => (turn.id === turnId ? { ...turn, id: queryId } : turn))
+        )
+        startStream(queryId)
+        return { ok: true }
+      } catch (err) {
+        if (err.status === 402) {
+          setTurns((prev) => prev.filter((t) => t.id !== turnId))
+          setPendingQuery({ query, sessionId: activeSession.chatSessionId })
+          return { ok: false, paymentRequired: true, data: err.data }
+        }
+        setError(err.message || 'Failed to send')
+        setTurns((prev) => prev.filter((t) => t.id !== turnId))
+        return { ok: false, error: err.message }
+      }
+    },
+    [ensureSession, selectedModels, startStream]
+  )
+
+  const retryPendingQuery = useCallback(async () => {
+    if (!pendingQuery) return { ok: false }
+    const { query } = pendingQuery
+    setPendingQuery(null)
+    return sendMessage(query)
+  }, [pendingQuery, sendMessage])
+
+  const startNewSession = useCallback(
+    (modelsOverride) => {
+      resetStream()
+      const modelsToUse = modelsOverride && modelsOverride.length ? modelsOverride : selectedModels
+      setSession(null)
+      setSelectedModels(modelsToUse)
+      setTurns([])
+    },
+    [selectedModels]
+  )
+
+  const removeSession = useCallback(
+    async (chatSessionId) => {
+      await deleteSession(chatSessionId).catch(() => { })
+      if (session?.chatSessionId === chatSessionId) {
+        setSession(null)
+        setTurns([])
+      }
+      fetchSessions()
+    },
+    [fetchSessions, session]
+  )
+
+  const value = useMemo(
+    () => ({
+      session,
+      sessions,
+      turns,
+      selectedModels,
+      setSelectedModels,
+      loading,
+      error,
+      isStreaming,
+      pendingQuery,
+      availableModels: AVAILABLE_MODELS,
+      sendMessage,
+      startNewSession,
+      loadSession,
+      fetchSessions,
+      removeSession,
+      resetStream,
+      retryPendingQuery,
+    }),
+    [
+      error,
+      fetchSessions,
+      isStreaming,
+      loadSession,
+      loading,
+      pendingQuery,
+      removeSession,
+      retryPendingQuery,
+      selectedModels,
+      sendMessage,
+      session,
+      sessions,
+      startNewSession,
+      turns,
+    ]
+  )
+
+  return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>
 }

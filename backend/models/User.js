@@ -9,6 +9,7 @@ const UserSchema = new mongoose.Schema({
   avatar: { type: String },
   solanaWallet: { type: String },
   tokenAccount: { type: String },
+  credits: { type: Number, default: 0 },
   delegateAuthorized: { type: Boolean, default: false },
   delegateAmount: { type: Number, default: 0 },
   pendingPayment: {
@@ -20,7 +21,7 @@ const UserSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-UserSchema.virtual('hasWallet').get(function() {
+UserSchema.virtual('hasWallet').get(function () {
   return !!this.solanaWallet;
 });
 

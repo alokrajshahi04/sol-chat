@@ -1,38 +1,102 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { AuthContext } from './AuthContextValue'
+import {
+  connectWalletSimple as apiConnectWalletSimple,
+  disconnectWallet as apiDisconnectWallet,
+  fetchSession,
+  login as apiLogin,
+  logout as apiLogout,
+  signup as apiSignup,
+} from '@/api/auth'
 
 export function AuthProvider({ children }) {
-  const stored = typeof window !== 'undefined' ? localStorage.getItem('sol-chat-user') : null
-  const [user, setUser] = useState(stored ? JSON.parse(stored) : null)
-  const loading = false
+  const [account, setAccount] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const login = (email) => {
-    const mockUser = {
-      email,
-      name: email.split('@')[0],
-      plan: 'Pro Plan',
-      credits: 100,
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBuvsMuLKu8mcJaNVHMzUYabcuPUCqzUtvlFr8tYTdClaTIXg8zsRrd2j-NWf-iVKUqda4RljsBYU-WDV1V7wjpQDhUI-Eo0t8hImPG3PJH8Gf5SUr4qpsHFQWby4rryYr5VFm5gwwfToTBvOBhgDDov7fBP4SZ_Yr4yWHWEWoPu00JWlWcKTgKr8cEAZ-V-9Lnq2mmhjHZfOt88njLHPYal-4NJfPtefyPylYfl3EjTjrRDC2gseHqbeiS4cDnCtigCszFPtQO24Kv',
+  const hydrateSession = useCallback(async () => {
+    setLoading(true)
+    try {
+      const session = await fetchSession()
+      setAccount(session)
+      setError(null)
+    } catch (err) {
+      setAccount(null)
+      setError(err.message || 'Unable to load session')
+    } finally {
+      setLoading(false)
     }
-    setUser(mockUser)
-    localStorage.setItem('sol-chat-user', JSON.stringify(mockUser))
-    return mockUser
+  }, [])
+
+  useEffect(() => {
+    hydrateSession()
+  }, [hydrateSession])
+
+  const login = async ({ email, password }) => {
+    setLoading(true)
+    try {
+      await apiLogin({ email, password })
+      await hydrateSession()
+    } catch (err) {
+      setError(err.message || 'Login failed')
+      throw err
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const signup = (email, password) => {
-    return login(email, password)
+  const signup = async ({ email, password, name }) => {
+    setLoading(true)
+    try {
+      await apiSignup({ email, password, name })
+      await hydrateSession()
+    } catch (err) {
+      setError(err.message || 'Signup failed')
+      throw err
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const logout = () => {
-    setUser(null)
-    localStorage.removeItem('sol-chat-user')
+  const logout = async () => {
+    await apiLogout().catch(() => { })
+    setAccount(null)
   }
+
+  const linkWallet = async ({ wallet }) => {
+    const result = await apiConnectWalletSimple({ wallet })
+    await hydrateSession()
+    return result
+  }
+
+  const unlinkWallet = async () => {
+    await apiDisconnectWallet().catch(() => { })
+    await hydrateSession()
+  }
+
+  const user = account?.user || null
+  const guest = account?.guest || null
+  const wallet = user?.solanaWallet || guest?.solanaWallet || null
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, loading }}>
+    <AuthContext.Provider
+      value={{
+        account,
+        user,
+        guest,
+        wallet,
+        loading,
+        error,
+        isAuthenticated: Boolean(user),
+        login,
+        signup,
+        logout,
+        linkWallet,
+        unlinkWallet,
+        refresh: hydrateSession,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )
 }
-
-// Hook moved to src/hooks/useAuth.js to support fast refresh

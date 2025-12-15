@@ -1,71 +1,35 @@
-import { API_BASE_URL, getAuthHeaders } from './config'
+import { apiFetch } from './config'
 
-/**
- * Login user
- */
-export async function login(email, password) {
-  const response = await fetch(`${API_BASE_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.message || 'Login failed')
-  }
-
-  const data = await response.json()
-  // Store token
-  if (data.token) {
-    localStorage.setItem('auth-token', data.token)
-  }
-
-  return data
+export function signup({ email, password, name }) {
+  return apiFetch('/auth/signup', { method: 'POST', body: { email, password, name } })
 }
 
-/**
- * Register new user
- */
-export async function register(email, password, name) {
-  const response = await fetch(`${API_BASE_URL}/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, name })
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.message || 'Registration failed')
-  }
-
-  const data = await response.json()
-  // Store token
-  if (data.token) {
-    localStorage.setItem('auth-token', data.token)
-  }
-
-  return data
+export function login({ email, password }) {
+  return apiFetch('/auth/login', { method: 'POST', body: { email, password } })
 }
 
-/**
- * Logout user
- */
 export function logout() {
-  localStorage.removeItem('auth-token')
+  return apiFetch('/auth/logout', { method: 'POST' })
 }
 
-/**
- * Get current user profile
- */
-export async function getCurrentUser() {
-  const response = await fetch(`${API_BASE_URL}/auth/me`, {
-    headers: getAuthHeaders()
+export function fetchSession() {
+  return apiFetch('/auth/me')
+}
+
+export function connectWallet({ wallet, signature, message }) {
+  return apiFetch('/auth/wallet/connect', {
+    method: 'POST',
+    body: { wallet, signature, message },
   })
+}
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch user')
-  }
+export function connectWalletSimple({ wallet }) {
+  return apiFetch('/auth/wallet/connect-simple', {
+    method: 'POST',
+    body: { wallet },
+  })
+}
 
-  return response.json()
+export function disconnectWallet() {
+  return apiFetch('/auth/wallet/disconnect', { method: 'POST' })
 }

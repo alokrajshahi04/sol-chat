@@ -23,11 +23,12 @@ const purchaseSchema = Joi.object({
 
 router.get('/balance', ensureSession, async (req, res) => {
   try {
-    if (!req.account.solanaWallet) {
-      return res.json({ balance: 0, hasWallet: false });
-    }
-    const balance = await solanaService.getCreditBalance(req.account.solanaWallet);
-    res.json({ balance, hasWallet: true, wallet: req.account.solanaWallet });
+    const balance = req.account.credits || 0;
+    res.json({
+      balance,
+      hasWallet: !!req.account.solanaWallet,
+      wallet: req.account.solanaWallet || null
+    });
   } catch (error) {
     console.error('Balance error:', error);
     res.status(500).json({ error: 'Failed to get balance', code: 'BALANCE_ERROR' });
@@ -38,14 +39,14 @@ router.post('/purchase', ensureSession, requireWallet, validateInput(purchaseSch
   try {
     const { account, accountType } = req;
     const { credits } = req.body;
-    
+
     const paymentRequest = x402.createPaymentRequest({
       creditsRequired: credits,
       userId: account._id.toString(),
       userType: accountType,
       userWallet: account.solanaWallet,
     });
-    
+
     account.pendingPayment = {
       reference: paymentRequest.reference,
       amount: parseInt(paymentRequest.amount),
@@ -54,7 +55,7 @@ router.post('/purchase', ensureSession, requireWallet, validateInput(purchaseSch
       expiresAt: new Date(paymentRequest.expiresAt),
     };
     await account.save();
-    
+
     await new Transaction({
       [accountType === 'user' ? 'userId' : 'guestId']: account._id,
       type: 'credit_purchase',
@@ -67,7 +68,7 @@ router.post('/purchase', ensureSession, requireWallet, validateInput(purchaseSch
         network: env.SOLANA_NETWORK,
       },
     }).save();
-    
+
     res.json({
       reference: paymentRequest.reference,
       credits,
@@ -92,35 +93,35 @@ router.post('/verify/:reference', ensureSession, validateInput(verifySchema), as
     const { reference } = req.params;
     const { signature, payerWallet } = req.body;
     const { account } = req;
-    
+
     const result = await x402.verifyPayment(reference, signature, payerWallet);
-    
+
     if (!result.success) {
       await Transaction.findOneAndUpdate({ paymentReference: reference }, { status: 'failed', error: result.error });
       return res.status(400).json({ error: result.error, code: 'VERIFICATION_FAILED' });
     }
-    
+
     if (result.userId !== account._id.toString()) {
       return res.status(403).json({ error: 'Payment mismatch', code: 'PAYMENT_MISMATCH' });
     }
-    
-    const mintSig = await solanaService.mintCredits(account.solanaWallet, result.credits);
-    const newBalance = await solanaService.getCreditBalance(account.solanaWallet);
-    
+
+    // Add credits to database
+    account.credits = (account.credits || 0) + result.credits;
+    account.pendingPayment = null;
+    await account.save();
+
+    const newBalance = account.credits;
+
     await Transaction.findOneAndUpdate(
       { paymentReference: reference },
       { status: 'completed', creditsBalanceAfter: newBalance, 'solana.signature': signature, 'solana.payerWallet': payerWallet, 'solana.confirmedAt': new Date() }
     );
-    
-    account.pendingPayment = null;
-    await account.save();
-    
+
     res.json({
       success: true,
       creditsAdded: result.credits,
       newBalance,
-      mintTransaction: mintSig,
-      explorerUrl: `https://explorer.solana.com/tx/${mintSig}?cluster=${env.SOLANA_NETWORK}`,
+      explorerUrl: `https://explorer.solana.com/tx/${signature}?cluster=${env.SOLANA_NETWORK}`,
     });
   } catch (error) {
     console.error('Verify error:', error);
@@ -132,9 +133,9 @@ router.get('/verify/:reference', async (req, res) => {
   try {
     const payment = x402.getPendingPayment(req.params.reference);
     if (!payment) return res.status(404).json({ error: 'Not found', code: 'REFERENCE_NOT_FOUND' });
-    
+
     const tx = await Transaction.findOne({ paymentReference: req.params.reference });
-    
+
     res.json({
       reference: req.params.reference,
       status: payment.status,
