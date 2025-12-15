@@ -4,6 +4,7 @@ import { ChatProvider } from '@/contexts/ChatContext'
 import { LoginPage } from '@/pages/LoginPage'
 import { ChatPage } from '@/pages/ChatPage'
 import { TransactionHistoryPage } from '@/pages/TransactionHistoryPage'
+import { LandingPage } from '@/pages/LandingPage'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { OAuthCallback } from '@/pages/OAuthCallback'
 import './index.css'
@@ -14,6 +15,7 @@ function App() {
       <ChatProvider>
         <BrowserRouter>
           <Routes>
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/chat/:chatSessionId" element={<ChatPage />} />
@@ -27,7 +29,6 @@ function App() {
             />
             <Route path="/auth/success" element={<OAuthCallback success />} />
             <Route path="/auth/error" element={<OAuthCallback />} />
-            <Route path="/" element={<Navigate to="/chat" replace />} />
           </Routes>
         </BrowserRouter>
       </ChatProvider>
