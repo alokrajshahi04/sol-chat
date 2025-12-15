@@ -12,6 +12,7 @@ const { isAuthenticated, ensureSession } = require('../middlewares/authMiddlewar
 const { chatSessionValid, queryMessageValid } = require('../middlewares/chatMiddlewares');
 const { checkCredits, deductCredits } = require('../middlewares/paymentMiddlewares');
 const { validateInput } = require('../middlewares/inputValidationMiddlewares');
+const solanaService = require('../lib/solana');
 
 const { streamFromModel } = require('../lib/streamFromModel');
 const { titleFromModel } = require('../lib/titleFromModel');
@@ -47,7 +48,7 @@ router.get('/sessions', isAuthenticated, async (req, res) => {
     const sessions = await ChatSession.find({ userId: req.user._id })
       .sort({ updatedAt: -1 })
       .select('_id title models createdAt updatedAt');
-    
+
     res.json({
       sessions: sessions.map(s => ({
         chatSessionId: s._id,
@@ -74,13 +75,13 @@ router.post('/session/:chatSessionId',
       const { chatSessionId } = req.params;
       const { chatSession, creditsRequired, account, accountType } = req;
       const { query } = req.body;
-      
+
       // Generate title for first message
       if (!chatSession.title) {
         chatSession.title = await titleFromModel(query).catch(() => 'New Chat');
         await chatSession.save();
       }
-      
+
       const queryMessage = new ChatMessage({
         chatSessionId,
         role: 'user',
@@ -88,9 +89,12 @@ router.post('/session/:chatSessionId',
         status: 'incomplete',
       });
       await queryMessage.save();
-      
+
+      // Deduct credits immediately (DB only) for UI responsiveness
+      await deductCredits(account, creditsRequired);
+
       startBackgroundStream(queryMessage, chatSession, account, accountType, creditsRequired);
-      
+
       res.status(202).json({
         queryId: queryMessage._id,
         chatSessionId,
@@ -110,7 +114,7 @@ router.get('/session/:chatSessionId', chatSessionValid, async (req, res) => {
     const messages = await ChatMessage.find({ chatSessionId: req.params.chatSessionId })
       .sort({ createdAt: 1 })
       .select('role model content status createdAt');
-    
+
     res.json({
       chatSessionId: req.params.chatSessionId,
       title: req.chatSession.title,
@@ -133,17 +137,17 @@ router.get('/session/:chatSessionId', chatSessionValid, async (req, res) => {
 router.get('/sse/:queryId', queryMessageValid, async (req, res) => {
   const { queryId } = req.params;
   const { queryMessage, chatSession } = req;
-  
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
-  
+
   const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-  
+
   send('init', { queryId, chatSessionId: chatSession._id, models: chatSession.models });
-  
+
   // Already completed - send cached
   if (queryMessage.status === 'completed') {
     const responses = await ChatMessage.find({ queryId });
@@ -151,7 +155,7 @@ router.get('/sse/:queryId', queryMessageValid, async (req, res) => {
     send('done', { message: 'Complete' });
     return res.end();
   }
-  
+
   // Live stream
   if (streamManager.isStreamActive(queryId)) {
     const unsub = streamManager.subscribe(queryId, {
@@ -192,7 +196,7 @@ async function startBackgroundStream(queryMessage, chatSession, account, account
   const queryId = queryMessage._id.toString();
   const chatSessionId = chatSession._id.toString();
   const { models } = chatSession;
-  
+
   streamManager.initStream(queryId, {
     chatSessionId,
     models,
@@ -200,10 +204,10 @@ async function startBackgroundStream(queryMessage, chatSession, account, account
     accountId: account._id.toString(),
     accountType,
   });
-  
+
   const savedContent = {};
   models.forEach(m => savedContent[m] = '');
-  
+
   // Save on interval
   const unsubSave = streamManager.onSave(queryId, async ({ responses, isComplete }) => {
     for (const model of models) {
@@ -229,10 +233,10 @@ async function startBackgroundStream(queryMessage, chatSession, account, account
       unsubSave();
     }
   });
-  
+
   // Get context
   const previousMessages = await ChatMessage.find({ chatSessionId }).sort({ createdAt: 1 }).limit(20);
-  
+
   // Stream all models
   await Promise.all(models.map(async model => {
     try {
@@ -240,7 +244,7 @@ async function startBackgroundStream(queryMessage, chatSession, account, account
         .filter(m => !m.model || m.model === model)
         .map(m => ({ role: m.role, content: m.content }))
         .slice(-10);
-      
+
       await streamFromModel(model, context, token => streamManager.appendToken(queryId, model, token));
       streamManager.completeModel(queryId, model);
     } catch (error) {
@@ -248,21 +252,36 @@ async function startBackgroundStream(queryMessage, chatSession, account, account
       streamManager.errorModel(queryId, model, `Failed: ${model}`);
     }
   }));
-  
+
   // Deduct credits
+  // Burn credits on-chain and log transaction
   if (account.solanaWallet) {
+    let signature = null;
     try {
-      const result = await deductCredits(account, creditsRequired);
+      signature = await solanaService.burnCredits(account.solanaWallet, creditsRequired);
+    } catch (error) {
+      console.error('Credit burn error:', error);
+      // We already deducted from DB, so we don't rollback. User got the query.
+    }
+
+    // Log transaction (one single log)
+    try {
+      const env = require('../config/env');
       await new Transaction({
         [accountType === 'user' ? 'userId' : 'guestId']: account._id,
         type: 'query_usage',
-        creditsAmount: -creditsRequired,
-        status: 'completed',
+        creditsAmount: creditsRequired, // Positive, UI adds '-'
+        status: signature ? 'completed' : 'pending',
         usage: { chatSessionId, queryId, models, costPerModel: 1 },
-        solana: result.signature ? { signature: result.signature } : undefined,
+        solana: signature ? {
+          signature,
+          payerWallet: account.solanaWallet,
+          network: env.SOLANA_NETWORK,
+          confirmedAt: new Date(),
+        } : undefined,
       }).save();
-    } catch (error) {
-      console.error('Credit deduction error:', error);
+    } catch (logErr) {
+      console.error('Failed to log transaction:', logErr);
     }
   }
 }

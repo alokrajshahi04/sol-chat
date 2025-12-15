@@ -52,7 +52,11 @@ export function ChatPage() {
   // Refresh balance when streaming ends
   useEffect(() => {
     if (prevStreaming && !isStreaming && wallet) {
-      refreshBalance()
+      // Small delay to ensure backend DB update is committed and readable
+      const timer = setTimeout(() => {
+        refreshBalance()
+      }, 1000)
+      return () => clearTimeout(timer)
     }
     setPrevStreaming(isStreaming)
   }, [isStreaming, prevStreaming, wallet, refreshBalance])

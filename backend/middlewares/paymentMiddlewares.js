@@ -56,13 +56,18 @@ async function checkCredits(req, res, next) {
   return x402.sendPaymentRequired(res, paymentRequest);
 }
 
+const solanaService = require('../lib/solana');
+
+// Deduct credits from database and on-chain
 // Deduct credits from database
 async function deductCredits(account, creditsAmount) {
   if (account.credits < creditsAmount) {
     throw new Error('Insufficient credits');
   }
+
   account.credits -= creditsAmount;
   await account.save();
+
   return { success: true, creditsDeducted: creditsAmount, remaining: account.credits };
 }
 
